@@ -39,8 +39,6 @@ import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5001').replace(/\/$/, '');
-
 const ImageProcessor: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalImage, setOriginalImage] = useState<string>('');
