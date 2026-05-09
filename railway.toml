@@ -1,5 +1,6 @@
 [build]
 builder = "NIXPACKS"
+nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
 startCommand = "python dng_backend.py"
