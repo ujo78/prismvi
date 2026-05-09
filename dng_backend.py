@@ -6,43 +6,43 @@ Integrates PrismVI25 notebook functionality
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import rawpy
-import exifread
-import cv2
-import numpy as np
 import base64
-from PIL import Image
 import io
 import time
 import os
 import tempfile
-import json
 
 app = Flask(__name__)
 
-# Enhanced CORS for Vercel deployment - Allow all origins for production
-CORS(app, 
-     origins=['*'],  # Allow all origins for deployment flexibility
-     methods=['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
-     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
-     supports_credentials=True,
-     max_age=600)  # Cache preflight requests for 10 minutes
+frontend_origin = os.getenv('FRONTEND_ORIGIN', '*')
+
+# CORS for frontend-backend integration (Vercel -> Railway)
+CORS(
+    app,
+    resources={r"/api/*": {"origins": frontend_origin}},
+    methods=['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+    allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+    supports_credentials=False,
+    max_age=600
+)
 
 # Global counters for dynamic dashboard
 processed_images_count = 0
 satisfaction_ratings = []
 
-# Add preflight handler for CORS
-@app.before_request
-def handle_preflight():
-    if request.method == "OPTIONS":
-        response = jsonify({'status': 'preflight'})
-        response.headers.add("Access-Control-Allow-Origin", "*")
-        response.headers.add('Access-Control-Allow-Headers', '*')
-        response.headers.add('Access-Control-Allow-Methods', '*')
-        return response
+def get_processing_dependencies():
+    """Import heavy processing dependencies lazily to avoid boot failures."""
+    try:
+        import rawpy
+        import exifread
+        import cv2
+        import numpy as np
+        from PIL import Image
+        return rawpy, exifread, cv2, np, Image
+    except Exception as e:
+        raise RuntimeError(f"Image processing dependencies unavailable: {e}")
 
-def mean_saturation_from_dng(dng_path):
+def mean_saturation_from_dng(dng_path, rawpy, cv2, np):
     """Extract saturation metrics from DNG file - from PrismVI25 notebook"""
     try:
         with rawpy.imread(dng_path) as raw:
@@ -69,7 +69,7 @@ def mean_saturation_from_dng(dng_path):
         print(f"Error processing DNG: {e}")
         return 0.0, 0.0, 0.0, None
 
-def extract_metadata(dng_path):
+def extract_metadata(dng_path, rawpy, exifread):
     """Extract EXIF metadata - from PrismVI25 notebook"""
     metadata = {}
     try:
@@ -99,7 +99,7 @@ def extract_metadata(dng_path):
         
     return metadata
 
-def apply_saturation_enhancement(image, level):
+def apply_saturation_enhancement(image, level, cv2, np):
     """Apply saturation enhancement based on level (1-10)"""
     # Convert to HSV
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
@@ -121,6 +121,8 @@ def process_dng():
     global processed_images_count
     
     try:
+        rawpy, exifread, cv2, np, Image = get_processing_dependencies()
+
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
@@ -138,11 +140,11 @@ def process_dng():
         start_time = time.time()
         
         # Extract original metrics
-        original_sat, original_max, original_min, original_image = mean_saturation_from_dng(dng_path)
-        metadata = extract_metadata(dng_path)
+        original_sat, original_max, original_min, original_image = mean_saturation_from_dng(dng_path, rawpy, cv2, np)
+        metadata = extract_metadata(dng_path, rawpy, exifread)
         
         # Apply enhancement
-        enhanced_image = apply_saturation_enhancement(original_image, level)
+        enhanced_image = apply_saturation_enhancement(original_image, level, cv2, np)
         
         # Calculate enhanced metrics
         enhanced_bgr = cv2.cvtColor(enhanced_image, cv2.COLOR_RGB2BGR)
@@ -184,12 +186,15 @@ def process_dng():
         
     except Exception as e:
         print(f"Error processing DNG: {e}")
-        return jsonify({'error': str(e)}), 500
+        status = 503 if "dependencies unavailable" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @app.route('/api/analyze-dng', methods=['POST'])
 def analyze_dng():
     """Analyze DNG file without enhancement"""
     try:
+        rawpy, exifread, cv2, np, _ = get_processing_dependencies()
+
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
@@ -204,8 +209,8 @@ def analyze_dng():
             dng_path = tmp_file.name
         
         # Extract metrics and metadata
-        mean_sat, max_sat, min_sat, image = mean_saturation_from_dng(dng_path)
-        metadata = extract_metadata(dng_path)
+        mean_sat, max_sat, min_sat, image = mean_saturation_from_dng(dng_path, rawpy, cv2, np)
+        metadata = extract_metadata(dng_path, rawpy, exifread)
         
         # Clean up
         os.unlink(dng_path)
@@ -221,7 +226,8 @@ def analyze_dng():
         
     except Exception as e:
         print(f"Error analyzing DNG: {e}")
-        return jsonify({'error': str(e)}), 500
+        status = 503 if "dependencies unavailable" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @app.route('/api/kpi-data', methods=['GET'])
 def get_kpi_data():
@@ -290,4 +296,4 @@ if __name__ == '__main__':
     print("  POST /api/analyze-dng - Analyze DNG without enhancement")
     print("  GET /api/kpi-data - Get dashboard KPI data")
     print("  GET /health - Health check")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug)
