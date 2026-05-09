@@ -286,6 +286,10 @@ def submit_satisfaction():
 def health_check():
     return jsonify({'status': 'healthy', 'service': 'DNG Processing Backend'})
 
+@app.route('/', methods=['GET'])
+def root_readiness():
+    return jsonify({'status': 'ok', 'service': 'DNG Processing Backend'})
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', '5001'))
     debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
