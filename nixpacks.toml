@@ -10,4 +10,4 @@ cmds = [
 ]
 
 [start]
-cmd = ". .venv/bin/activate && python dng_backend.py"
+cmd = ". .venv/bin/activate && gunicorn --bind 0.0.0.0:$PORT dng_backend:app"
