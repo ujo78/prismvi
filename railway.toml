@@ -3,6 +3,6 @@ builder = "NIXPACKS"
 nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
-startCommand = "python dng_backend.py"
+startCommand = ". .venv/bin/activate && python dng_backend.py"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
