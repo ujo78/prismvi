@@ -10,4 +10,4 @@ cmds = [
 ]
 
 [start]
-cmd = ". .venv/bin/activate && gunicorn --bind 0.0.0.0:$PORT dng_backend:app"
+cmd = ". .venv/bin/activate && export LD_LIBRARY_PATH=/nix/store/*-gcc-*/lib:/nix/store/*-glibc-*/lib:${LD_LIBRARY_PATH} && gunicorn --bind 0.0.0.0:$PORT dng_backend:app"
