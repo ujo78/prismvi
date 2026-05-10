@@ -142,6 +142,10 @@ def process_dng():
         # Extract original metrics
         original_sat, original_max, original_min, original_image = mean_saturation_from_dng(dng_path, rawpy, cv2, np)
         metadata = extract_metadata(dng_path, rawpy, exifread)
+
+        if original_image is None or getattr(original_image, "size", 0) == 0:
+            os.unlink(dng_path)
+            return jsonify({'error': 'Failed to decode DNG image data'}), 400
         
         # Apply enhancement
         enhanced_image = apply_saturation_enhancement(original_image, level, cv2, np)
