@@ -19,7 +19,7 @@ frontend_origin = os.getenv('FRONTEND_ORIGIN', '*')
 # CORS for frontend-backend integration (Vercel -> Railway)
 CORS(
     app,
-    resources={r"/api/*": {"origins": frontend_origin}},
+    resources={r"/api/.*": {"origins": frontend_origin}},
     methods=['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
     supports_credentials=False,
